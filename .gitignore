@@ -1,0 +1,5 @@
+*.o
+fuzzer
+help
+*.zip
+*.code-workspace
