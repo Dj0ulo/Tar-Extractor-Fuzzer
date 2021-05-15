@@ -9,19 +9,28 @@ CFLAGS += -g
 
 EXEC=fuzzer
 
+OBJDIR = obj
+SRCDIR = src
+
 all: $(EXEC)
 
-help: help.o
+help: $(OBJDIR)/help.o
 	$(CC) -o $@ $^ $(CFLAGS)
 
-fuzzer: main.o
+fuzzer: $(OBJDIR)/main.o $(OBJDIR)/tar.o $(OBJDIR)/fuzz.o
 	$(CC) -o $(EXEC) $^ $(CFLAGS)
 
-%.o: %.c
+objdir:
+	mkdir $(OBJDIR)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:
-	rm -rf *.o
+	rm -rf $(OBJDIR)/*.o
 
 mrproper: clean
 	rm -rf $(EXEC) help
+
+succ:
+	rm -rf success_* *.dat

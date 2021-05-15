@@ -3,3 +3,9 @@ fuzzer
 help
 *.zip
 *.code-workspace
+*.tar
+test/*
+success_*
+.vscode/*
+*.Identifier
+*.dat

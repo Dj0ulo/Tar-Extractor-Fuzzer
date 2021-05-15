@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-struct tar_t
+struct tar_header
 {                              /* byte offset */
     char name[100];               /*   0 */
     char mode[8];                 /* 100 */
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
  * @param entry: The tar header
  * @return the value of the checksum
  */
-unsigned int calculate_checksum(struct tar_t* entry){
+unsigned int calculate_checksum(struct tar_header* entry){
     // use spaces for the checksum bytes while calculating the checksum
     memset(entry->chksum, ' ', 8);
 
