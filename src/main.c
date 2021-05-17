@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "tar.h"
 #include "fuzz.h"
@@ -13,6 +14,8 @@ int main(int argc, char *argv[])
   }
   printf("\n--- FUZZER ---\n");
   printf("%s\n",argv[1]);
+
+  srand(time(NULL));
 
   fuzz(argv[1]);
 

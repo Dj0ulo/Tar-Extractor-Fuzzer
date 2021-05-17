@@ -33,17 +33,26 @@ void header_init(tar_header *entry)
 {
   memset(entry, 0, sizeof(tar_header));
 }
+void set_random_name_header(tar_header* header)
+{
+  sprintf(header->name, "name_%06u.dat", rand()%1000000);
+}
+void set_size_header(tar_header* header, unsigned long size)
+{
+  sprintf(header->size, "%011lo", size);
+}
 void set_simple_header(tar_header *entry, unsigned long size_buffer)
 {
   header_init(entry);
-  strcpy(entry->name, "name.dat");
-  sprintf(entry->mode, "0000644");
+  set_random_name_header(entry);
+  sprintf(entry->mode, "0007777");
   sprintf(entry->uid, "0001750");
-  sprintf(entry->size, "%011lu", size_buffer);
+  sprintf(entry->gid, "0001750");
+  set_size_header(entry, size_buffer);
   sprintf(entry->mtime, "14047760421");
   entry->typeflag = '0';
   sprintf(entry->magic, "ustar");
-  memcpy(entry->version, "00", 2);
+  memcpy(entry->version, "00", VERSION_LEN);
   sprintf(entry->uname, "user");
   sprintf(entry->gname, "user");
   sprintf(entry->devmajor, "0000000");
