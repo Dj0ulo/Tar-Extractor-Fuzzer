@@ -12,7 +12,7 @@ EXEC=fuzzer
 OBJDIR = obj
 SRCDIR = src
 
-all: $(EXEC)
+all: objdir $(EXEC)
 
 help: $(OBJDIR)/help.o
 	$(CC) -o $@ $^ $(CFLAGS)
@@ -21,16 +21,16 @@ fuzzer: $(OBJDIR)/main.o $(OBJDIR)/tar.o $(OBJDIR)/fuzz.o
 	$(CC) -o $(EXEC) $^ $(CFLAGS)
 
 objdir:
-	mkdir $(OBJDIR)
+	mkdir -p $(OBJDIR)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:
-	rm -rf $(OBJDIR)/*.o
+	rm -rf $(OBJDIR)
 
-mrproper: clean
-	rm -rf $(EXEC) help
+mrproper: clean succ
+	rm -rf $(EXEC) help $(OBJDIR)
 
 succ:
 	rm -rf success_* *.dat

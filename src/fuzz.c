@@ -96,9 +96,14 @@ void generic_field_tests(const char *field_name, char *field, unsigned size)
   memset(field, '4', size);
   test_header();
 
-  test_name("terminated_before", field_name);
+  test_name("middle_null_termination", field_name);
   memset(field, 0, size);
-  memset(field, '2', size/2);
+  memset(field, '2', size / 2);
+  test_header();
+
+  test_name("0 and_middle_null_termination", field_name);
+  memset(field, 0, size);
+  memset(field, '0', size / 2);
   test_header();
 
   test_name("not_ascii", field_name);
@@ -129,12 +134,13 @@ void name(int linkname)
     field = header.name;
     sprintf(field_name, "name");
     size = NAME_LEN;
-  }else{
+  }
+  else
+  {
     test_name("same_as_name", field_name);
     strncpy(field, header.name, size);
     test_header();
   }
-
 
   test_name("empty", field_name);
   strncpy(field, "", size);
@@ -149,32 +155,37 @@ void name(int linkname)
     test_header();
   }
 
-  char forbidden_char[] = {'*', '\\', '/', '"', '?', '.', ' '};
+  char forbidden_char[] = {'*', '\\', '/', '"', '?', ' '};
   for (unsigned i = 0; i < sizeof(forbidden_char); i++)
   {
-    char s[2];
-    sprintf(s, "%c", forbidden_char[i]);
-    strncpy(field, s, size);
+    field[0] = forbidden_char[i];
     sprintf(current_test, "%s_weird_char='%c'", field_name, field[0]);
     test_header();
   }
 
-  test_name("fill_all", field_name);
+  test_name("not_terminated", field_name);
   memset(field, 'a', size);
+  test_header();
+
+  test_name("fill_all", field_name);
+  sprintf(field, "%0*d.dat", size - 5, 0);
   test_header();
 
   test_name("non_ascii", field_name);
   strncpy(field, "😂😎.dat", size);
   test_header();
-}
 
+  test_name("directory", field_name);
+  strncpy(field, "tests/", size);
+  test_header();
+}
 void mode()
 {
   set_simple_header(&header, 0);
   char *field = header.mode;
   generic_field_tests("mode", field, MODE_LEN);
 
-  for (unsigned i = 0; i < sizeof(ALL_MODE)/sizeof(ALL_MODE[0]); i++)
+  for (unsigned i = 0; i < sizeof(ALL_MODE) / sizeof(ALL_MODE[0]); i++)
   {
     set_simple_header(&header, 0);
     sprintf(field, "%07o", ALL_MODE[i]);
@@ -233,7 +244,6 @@ void size()
   write_tar(TEST_FILE, &header, buffer, len_buffer);
   test_file_extractor();
 }
-
 void mtime()
 {
   set_simple_header(&header, 0);
@@ -242,19 +252,19 @@ void mtime()
   generic_field_tests(field_name, field, MTIME_LEN);
 
   test_name("current", field_name);
-  sprintf(field,"%lo",(unsigned long)time(NULL));
+  sprintf(field, "%lo", (unsigned long)time(NULL));
   test_header();
 
   test_name("later", field_name);
-  sprintf(field,"%lo",(unsigned long)time(NULL) + 50*3600);
+  sprintf(field, "%lo", (unsigned long)time(NULL) + 50 * 3600);
   test_header();
 
   test_name("sooner", field_name);
-  sprintf(field,"%lo",(unsigned long)time(NULL) + 50*3600);
+  sprintf(field, "%lo", (unsigned long)time(NULL) + 50 * 3600);
   test_header();
 
   test_name("far_future", field_name);
-  sprintf(field,"%lo",(unsigned long)time(NULL)*2);
+  sprintf(field, "%lo", (unsigned long)time(NULL) * 2);
   test_header();
 }
 void chksum()
@@ -277,7 +287,6 @@ void typeflag()
     test_header();
   }
 }
-
 void linkname()
 {
   set_simple_header(&header, 0);
@@ -286,7 +295,6 @@ void linkname()
 
   name(1);
 }
-
 void magic()
 {
   set_simple_header(&header, 0);
@@ -307,7 +315,6 @@ void version()
     test_header();
   }
 }
-
 void uname(int gname)
 {
   char *field = header.uname;
@@ -323,7 +330,6 @@ void uname(int gname)
   set_simple_header(&header, 0);
   generic_field_tests(field_name, field, size);
 }
-
 void end_bytes()
 {
   char end_bytes[END_LEN * 2];
@@ -347,10 +353,60 @@ void end_bytes()
   }
 }
 
+void many_files()
+{
+  const size_t N = 50;
+  tar_entry files[N];
+
+  // init
+  for (size_t i = 0; i < N; i++)
+  {
+    set_simple_header(&files[i].header, 0);
+    files[i].content = NULL;
+    files[i].size = 0;
+  }
+
+  sprintf(current_test, "%lu_files", N);
+  for (size_t i = 0; i < N; i++)
+  {
+    sprintf(files[i].header.name, "this_is_the_file_number_%lu.dat", i);
+    files[i].content = malloc(30);
+    sprintf(files[i].content, "file number %lu", i);
+    files[i].size = strlen(files[i].content);
+  }
+  write_tar_entries(TEST_FILE, files, N);
+  test_file_extractor();
+
+  sprintf(current_test, "files_same_name");
+  for (int i = 0; i < 5; i++)
+  {
+    strncpy(files[i].header.name, "same_name.dat", NAME_LEN);
+    files[i].content = malloc(50);
+    sprintf(files[i].content, "file number %d", i);
+    files[i].size = strlen(files[i].content);
+  }
+  write_tar_entries(TEST_FILE, files, 5);
+  test_file_extractor();
+
+  sprintf(current_test, "directory_with_data");
+  strncpy(files[0].header.name, "test.dat/", NAME_LEN);
+  files[0].content = malloc(50);
+  sprintf(files[0].content, "content of the directory like if it was a file");
+  files[0].size = strlen(files[0].content);
+  write_tar_entries(TEST_FILE, files, 1);
+  test_file_extractor();
+
+  FILE *f = fopen(TEST_FILE, 'w');
+  if(f){
+    fclose(f);
+    sprintf(current_test, "nothing in");
+    test_file_extractor();
+  }
+}
 void fuzz(const char *extractor)
 {
   strcpy(extractor_file, extractor);
-  // name(0);
+  name(0);
   mode();
   uid();
   gid();
@@ -363,5 +419,6 @@ void fuzz(const char *extractor)
   version();
   uname(0);
   uname(1);
-  // end_bytes();
+  end_bytes();
+  many_files();
 }

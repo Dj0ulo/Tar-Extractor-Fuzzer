@@ -33,11 +33,11 @@ void header_init(tar_header *entry)
 {
   memset(entry, 0, sizeof(tar_header));
 }
-void set_random_name_header(tar_header* header)
+void set_random_name_header(tar_header *header)
 {
-  sprintf(header->name, "name_%06u.dat", rand()%1000000);
+  sprintf(header->name, "name_%06u.dat", rand() % 1000000);
 }
-void set_size_header(tar_header* header, unsigned long size)
+void set_size_header(tar_header *header, unsigned long size)
 {
   sprintf(header->size, "%011lo", size);
 }
@@ -50,6 +50,7 @@ void set_simple_header(tar_header *entry, unsigned long size_buffer)
   sprintf(entry->gid, "0001750");
   set_size_header(entry, size_buffer);
   sprintf(entry->mtime, "14047760421");
+  sprintf(entry->chksum, DO_CHKSUM);
   entry->typeflag = '0';
   sprintf(entry->magic, "ustar");
   memcpy(entry->version, "00", VERSION_LEN);
@@ -70,8 +71,21 @@ void write_tar(const char *filename, tar_header *entry, const char *buffer, unsi
 
   write_tar_end(filename, entry, buffer, size, end_bytes, END_LEN);
 }
+
+void write_header(FILE *f, tar_header *header)
+{
+  char old_chcksum[CHKSUM_LEN];
+  strncpy(old_chcksum, header->chksum, CHKSUM_LEN);
+  if (strncmp(DO_CHKSUM, header->chksum, CHKSUM_LEN) == 0)
+    calculate_checksum(header);
+
+  fwrite(header, sizeof(tar_header), 1, f);
+
+  strncpy(header->chksum, old_chcksum, CHKSUM_LEN);
+}
+
 void write_tar_end(const char *filename,
-                   tar_header *entry,
+                   tar_header *header,
                    const char *buffer,
                    unsigned long size,
                    const char *end_bytes,
@@ -83,16 +97,14 @@ void write_tar_end(const char *filename,
     puts("Could not write to file");
     return;
   }
-  calculate_checksum(entry);
-  fwrite(entry, sizeof(tar_header), 1, f);
+
+  write_header(f, header);
   fwrite(buffer, size, 1, f);
-
   fwrite(end_bytes, end_size, 1, f);
-
   fclose(f);
 }
 
-void write_file(const char *filename, const char *buffer, unsigned long size)
+void write_tar_entries(const char *filename, tar_entry entries[], size_t count)
 {
   FILE *f = fopen(filename, "wb");
   if (!f)
@@ -100,6 +112,27 @@ void write_file(const char *filename, const char *buffer, unsigned long size)
     puts("Could not write to file");
     return;
   }
-  fwrite(buffer, size, 1, f);
+
+  for (size_t i = 0; i < count; i++)
+  {
+    tar_entry *e = &entries[i];
+    set_size_header(&e->header, e->size);
+    write_header(f, &e->header);
+
+    fwrite(e->content, e->size, 1, f);
+    if(e->content)
+      free(e->content);
+
+    unsigned size_padding = 512 - (e->size%512);
+    char padding[size_padding];
+    memset(padding, 0, size_padding);
+    fwrite(padding, size_padding, 1, f);
+
+  }
+
+  char end_bytes[END_LEN];
+  memset(end_bytes, 0, END_LEN);
+  fwrite(end_bytes, END_LEN, 1, f);
+
   fclose(f);
 }
