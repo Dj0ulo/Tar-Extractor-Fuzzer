@@ -14,6 +14,10 @@ static char current_test[50];
 static tar_header header;
 static const char WEIRD_CHARS[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 127, 128, 130, 200, 255};
 
+static unsigned errors_number = 0;
+static unsigned no_out_number = 0;
+static unsigned crashes_number = 0;
+
 static const unsigned ALL_MODE[] = {
     TSUID,
     TSGID,
@@ -28,12 +32,12 @@ static const unsigned ALL_MODE[] = {
     TOWRITE,
     TOEXEC};
 
+/*Tests the extractor with the file TEST_FILE and count make some stats*/
 int test_file_extractor()
 {
-  static unsigned test_num = 0;
   int rv = 0;
   char cmd[250];
-  sprintf(cmd, "%s %s", extractor_file, TEST_FILE);
+  sprintf(cmd, "%s %s 2>&1", extractor_file, TEST_FILE);
   char buf[LEN_CRASH_MSG];
   FILE *fp;
 
@@ -43,14 +47,19 @@ int test_file_extractor()
     return -1;
   }
 
-  if (fgets(buf, LEN_CRASH_MSG, fp) != NULL && strncmp(buf, CRASH_MSG, LEN_CRASH_MSG) == 0)
+  if (fgets(buf, LEN_CRASH_MSG, fp) == NULL)
+    no_out_number++;
+  else if (strncmp(buf, CRASH_MSG, LEN_CRASH_MSG) != 0)
+    errors_number++;
+  else
   {
-    char new_name[100];
-    sprintf(new_name, "success_%03u_%s.tar", test_num, current_test);
-    printf(KGRN "Crash message n°%u -> %s" KNRM "\n", test_num, current_test);
-    rename(TEST_FILE, new_name);
-    test_num++;
     rv = 1;
+    crashes_number++;
+
+    char new_name[100];
+    sprintf(new_name, "success_%03u_%s.tar", crashes_number, current_test);
+    printf(KGRN "Crash message n°%u " KNRM "-> %s \n", crashes_number, current_test);
+    rename(TEST_FILE, new_name);
   }
   if (pclose(fp) == -1)
   {
@@ -60,18 +69,22 @@ int test_file_extractor()
   return rv;
 }
 
+/*Testing the header with no file content*/
 void test_header()
 {
   write_empty_tar(TEST_FILE, &header);
   test_file_extractor();
 }
 
+/*Sets the test name currently running*/
 void test_name(const char *name, const char *field_name)
 {
   sprintf(current_test, "%s_%s", field_name, name);
 }
 
 /* TESTS */
+
+/*Generic tests to apply to almost every fields*/
 void generic_field_tests(const char *field_name, char *field, unsigned size)
 {
   test_name("empty", field_name);
@@ -123,7 +136,7 @@ void generic_field_tests(const char *field_name, char *field, unsigned size)
 
 void name(int linkname)
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
 
   char *field = header.linkname;
   char field_name[] = "linkname";
@@ -146,7 +159,7 @@ void name(int linkname)
   strncpy(field, "", size);
   test_header();
 
-  strncpy(field, "0.dat", size);
+  strncpy(field, "0" EXT, size);
 
   for (unsigned i = 0; i < sizeof(WEIRD_CHARS); i++)
   {
@@ -168,46 +181,50 @@ void name(int linkname)
   test_header();
 
   test_name("fill_all", field_name);
-  sprintf(field, "%0*d.dat", size - 5, 0);
+  sprintf(field, "%0*d" EXT, (int)(size - strlen(EXT) - 1), 0);
   test_header();
 
   test_name("non_ascii", field_name);
-  strncpy(field, "😂😎.dat", size);
+  strncpy(field, "😂😎" EXT, size);
   test_header();
 
   test_name("directory", field_name);
-  strncpy(field, "tests/", size);
+  strncpy(field, "tests" EXT "/", size);
   test_header();
 }
+
 void mode()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.mode;
   generic_field_tests("mode", field, MODE_LEN);
 
   for (unsigned i = 0; i < sizeof(ALL_MODE) / sizeof(ALL_MODE[0]); i++)
   {
-    set_simple_header(&header, 0);
+    set_simple_header(&header);
     sprintf(field, "%07o", ALL_MODE[i]);
     sprintf(current_test, "mode='%s'", field);
     test_header();
   }
 }
+
 void uid()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.uid;
   generic_field_tests("uid", field, UID_LEN);
 }
+
 void gid()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.gid;
   generic_field_tests("gid", field, GID_LEN);
 }
+
 void size()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.size;
   generic_field_tests("size", field, SIZE_LEN);
 
@@ -244,9 +261,10 @@ void size()
   write_tar(TEST_FILE, &header, buffer, len_buffer);
   test_file_extractor();
 }
+
 void mtime()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.mtime;
   char field_name[] = "mtime";
   generic_field_tests(field_name, field, MTIME_LEN);
@@ -267,15 +285,17 @@ void mtime()
   sprintf(field, "%lo", (unsigned long)time(NULL) * 2);
   test_header();
 }
+
 void chksum()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.chksum;
   generic_field_tests("chksum", field, CHKSUM_LEN);
 }
+
 void typeflag()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char field_name[] = "typeflag";
   char name_current_test[30];
 
@@ -287,23 +307,26 @@ void typeflag()
     test_header();
   }
 }
+
 void linkname()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.linkname;
   generic_field_tests("linkname", field, LINKNAME_LEN);
 
   name(1);
 }
+
 void magic()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.magic;
   generic_field_tests("magic", field, MAGIC_LEN);
 }
+
 void version()
 {
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   char *field = header.version;
   generic_field_tests("version", field, VERSION_LEN);
 
@@ -315,6 +338,7 @@ void version()
     test_header();
   }
 }
+
 void uname(int gname)
 {
   char *field = header.uname;
@@ -327,19 +351,21 @@ void uname(int gname)
     sprintf(field_name, "gname");
     size = GNAME_LEN;
   }
-  set_simple_header(&header, 0);
+  set_simple_header(&header);
   generic_field_tests(field_name, field, size);
 }
+
 void end_bytes()
 {
   char end_bytes[END_LEN * 2];
   memset(end_bytes, 0, END_LEN * 2);
 
   char buffer[] = "hello";
-  unsigned long len_buffer = strlen(buffer);
-  set_simple_header(&header, strlen(buffer));
+  size_t len_buffer = strlen(buffer);
+  set_simple_header(&header);
+  set_size_header(&header, strlen(buffer));
 
-  int lengths[] = {END_LEN * 2, END_LEN, 1023, 512, 511, 256, 10, 1, 0};
+  int lengths[] = {END_LEN * 2, END_LEN, 512, 1, 0};
 
   for (unsigned i = 0; i < sizeof(lengths) / sizeof(int); i++)
   {
@@ -347,21 +373,22 @@ void end_bytes()
     write_tar_end(TEST_FILE, &header, buffer, len_buffer, end_bytes, lengths[i]);
     test_file_extractor();
 
-    sprintf(current_test, "end_bytes(%d)_wo_file", lengths[i]);
+    sprintf(current_test, "end_bytes(%d)_w-o_file", lengths[i]);
     write_tar_end(TEST_FILE, &header, "", 0, end_bytes, lengths[i]);
     test_file_extractor();
   }
 }
 
-void many_files()
+void files()
 {
   const size_t N = 50;
   tar_entry files[N];
+  tar_entry *ff = &files[0];
 
   // init
   for (size_t i = 0; i < N; i++)
   {
-    set_simple_header(&files[i].header, 0);
+    set_simple_header(&files[i].header);
     files[i].content = NULL;
     files[i].size = 0;
   }
@@ -369,7 +396,7 @@ void many_files()
   sprintf(current_test, "%lu_files", N);
   for (size_t i = 0; i < N; i++)
   {
-    sprintf(files[i].header.name, "this_is_the_file_number_%lu.dat", i);
+    sprintf(files[i].header.name, "this_is_the_file_number_%lu" EXT, i);
     files[i].content = malloc(30);
     sprintf(files[i].content, "file number %lu", i);
     files[i].size = strlen(files[i].content);
@@ -377,10 +404,10 @@ void many_files()
   write_tar_entries(TEST_FILE, files, N);
   test_file_extractor();
 
-  sprintf(current_test, "files_same_name");
+  test_name("same_name", "files");
   for (int i = 0; i < 5; i++)
   {
-    strncpy(files[i].header.name, "same_name.dat", NAME_LEN);
+    strncpy(files[i].header.name, "same_name" EXT, NAME_LEN);
     files[i].content = malloc(50);
     sprintf(files[i].content, "file number %d", i);
     files[i].size = strlen(files[i].content);
@@ -388,24 +415,39 @@ void many_files()
   write_tar_entries(TEST_FILE, files, 5);
   test_file_extractor();
 
-  sprintf(current_test, "directory_with_data");
-  strncpy(files[0].header.name, "test.dat/", NAME_LEN);
-  files[0].content = malloc(50);
-  sprintf(files[0].content, "content of the directory like if it was a file");
-  files[0].size = strlen(files[0].content);
+  test_name("dir_with_data", "files");
+  strncpy(ff->header.name, "test" EXT "/", NAME_LEN);
+  ff->content = malloc(50);
+  ff->size = sprintf(ff->content, "content of the directory like if it was a file");
   write_tar_entries(TEST_FILE, files, 1);
   test_file_extractor();
 
-  FILE *f = fopen(TEST_FILE, 'w');
-  if(f){
+  FILE *f = fopen(TEST_FILE, "wb");
+  if (f)
+  {
     fclose(f);
-    sprintf(current_test, "nothing in");
+    test_name("empty_tar", "files");
     test_file_extractor();
   }
+
+  test_name("big_file", "files");
+  set_simple_header(&ff->header);
+  size_t big = 50 * 1000 * 1000;
+  ff->content = malloc(big);
+  memset(ff->content, 'A', big);
+  ff->size = big;
+  write_tar_entries(TEST_FILE, files, 1);
+  test_file_extractor();
 }
+
+/*Execute all fuzzer tests*/
 void fuzz(const char *extractor)
 {
   strcpy(extractor_file, extractor);
+
+  puts("Begin fuzzing...");
+  clock_t start = clock();
+
   name(0);
   mode();
   uid();
@@ -420,5 +462,15 @@ void fuzz(const char *extractor)
   uname(0);
   uname(1);
   end_bytes();
-  many_files();
+  files();
+
+  clock_t duration = clock() - start;
+
+  puts("Cleaning extractor results...");
+  system("rm -rf *" EXT" "TEST_FILE);
+
+  printf("\n%u tests passed in %.3f s:\n", errors_number + no_out_number + crashes_number, (float)duration / CLOCKS_PER_SEC);
+  printf(KYEL "%u without output" KNRM "\n", no_out_number);
+  printf(KRED "%u errors" KNRM " catched by the extractor\n", errors_number);
+  printf(KGRN "%u crashes" KNRM " detected by the fuzzer\n", crashes_number);
 }

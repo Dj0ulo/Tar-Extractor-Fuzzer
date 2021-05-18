@@ -10,6 +10,7 @@
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
+#define EXT ".dat" //extension to put at the end of file to easily clean
 
 void fuzz(const char* extractor);
 

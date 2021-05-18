@@ -64,18 +64,14 @@ typedef struct
 // set chksum to that for the write functions to compute it before writing it
 #define DO_CHKSUM "docheck" 
 
-unsigned calculate_checksum(tar_header *entry);
-void header_init(tar_header *entry);
+unsigned calculate_checksum(tar_header *header);
 void set_random_name_header(tar_header *header);
-void set_size_header(tar_header *header, unsigned long size);
-void set_simple_header(tar_header *entry, unsigned long size_buffer);
-void write_empty_tar(const char *filename, tar_header *entry);
+void set_size_header(tar_header *header, size_t size);
+void set_simple_header(tar_header *header);
+void write_empty_tar(const char *filename, tar_header *header);
+void write_tar(const char *filename, tar_header *header, const char *buffer, size_t size);
 void write_tar_end(const char *filename,
-                   tar_header *header,
-                   const char *buffer,
-                   unsigned long size,
-                   const char *end_bytes,
-                   unsigned long end_size);
-void write_tar(const char *filename, tar_header *entry, const char *buffer, unsigned long size);
+                   tar_header *header, const char *buffer, size_t size,
+                   const char *end_bytes, size_t end_size);
 void write_tar_entries(const char *filename, tar_entry entries[], size_t count);
 #endif
